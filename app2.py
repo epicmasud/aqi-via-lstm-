@@ -1,7 +1,9 @@
 import streamlit as st
 import numpy as np
-import pickle
 from tensorflow.keras.models import load_model
+from tensorflow.keras.metrics import MeanSquaredError
+import pickle
+import time
 
 # -----------------------------
 # Load model and scaler
