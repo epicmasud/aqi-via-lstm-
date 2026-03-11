@@ -1,27 +1,25 @@
 import streamlit as st
 import numpy as np
-from tensorflow.keras.models import load_model
-from tensorflow.keras.metrics import MeanSquaredError
 import pickle
-import time
+from tensorflow.keras.models import load_model
 
 # -----------------------------
-# Load model and scaler
+# Load model
 # -----------------------------
-model = load_model("aqi_lstm_model.h5")
+model = load_model("lstm_model.h5")
 
+# -----------------------------
+# Load scaler
+# -----------------------------
 with open("scaler.pkl", "rb") as f:
     scaler = pickle.load(f)
 
-# -----------------------------
-# App Title
-# -----------------------------
-st.title("AQI Prediction using LSTM")
+st.title("Air Quality Index Prediction (LSTM Model)")
 
-st.write("Enter Weather and Pollution Parameters")
+st.write("Enter weather and pollution parameters to predict AQI")
 
 # -----------------------------
-# Input features
+# INPUT SECTION
 # -----------------------------
 
 tavg = st.number_input("Average Temperature")
@@ -45,39 +43,54 @@ co = st.number_input("CO")
 season = st.selectbox("Season", [1,2,3,4])
 
 aqi_lag1 = st.number_input("Previous Day AQI")
-aqi_lag2 = st.number_input("Two Days Ago AQI")
+aqi_lag2 = st.number_input("AQI Two Days Ago")
 
 # -----------------------------
-# Prediction Button
+# Prediction
 # -----------------------------
 
 if st.button("Predict AQI"):
 
-    features = np.array([[
-
-        tavg,tmin,tmax,prcp,wspd,pres,
+    input_features = np.array([[
+        tavg,tmin,tmax,
+        prcp,wspd,pres,
         humidity,
-        pm25,pm10,o3,no2,so2,co,
-        season,aqi_lag1,aqi_lag2
-
+        pm25,pm10,o3,
+        no2,so2,co,
+        season,
+        aqi_lag1,aqi_lag2
     ]])
 
-    # Dummy AQI column for scaler
-    dummy = np.zeros((1, len(features[0]) + 1))
-    dummy[0,:-1] = features
+    # create dummy row for scaler
+    dummy = np.zeros((1,17))
+    dummy[0,:-1] = input_features
 
     scaled = scaler.transform(dummy)
 
     X = scaled[:,:-1]
 
     # reshape for LSTM
-    X = X.reshape((1,1,X.shape[1]))
+    X = X.reshape((1,1,16))
 
-    pred = model.predict(X)
+    prediction = model.predict(X)
 
-    dummy_pred = np.zeros((1, len(features[0]) + 1))
-    dummy_pred[0,-1] = pred
+    dummy_pred = np.zeros((1,17))
+    dummy_pred[0,-1] = prediction
 
-    predicted_aqi = scaler.inverse_transform(dummy_pred)[0,-1]
+    final_aqi = scaler.inverse_transform(dummy_pred)[0,-1]
 
-    st.success(f"Predicted AQI: {predicted_aqi:.2f}")
+    st.success(f"Predicted AQI: {round(final_aqi,2)}")
+
+    # AQI Category
+    if final_aqi <= 50:
+        st.info("Air Quality: Good")
+    elif final_aqi <= 100:
+        st.info("Air Quality: Moderate")
+    elif final_aqi <= 150:
+        st.warning("Air Quality: Unhealthy for Sensitive Groups")
+    elif final_aqi <= 200:
+        st.warning("Air Quality: Unhealthy")
+    elif final_aqi <= 300:
+        st.error("Air Quality: Very Unhealthy")
+    else:
+        st.error("Air Quality: Hazardous")
